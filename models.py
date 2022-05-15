@@ -52,6 +52,11 @@ class Generator(nn.Module):
 
         return edges_logits, nodes_logits
 
+    def initialize_outputlayer(self, conv_dims, z_dim, vertexes, edges, nodes, dropout):
+        self.edges_layer = nn.Linear(conv_dims[-1], edges * vertexes * vertexes)
+        self.nodes_layer = nn.Linear(conv_dims[-1], vertexes * nodes)
+        self.dropoout = nn.Dropout(p=dropout)
+
 
 class Discriminator(nn.Module):
     """Discriminator network with PatchGAN."""
@@ -71,6 +76,14 @@ class Discriminator(nn.Module):
         self.linear_layer = nn.Sequential(*layers)
 
         self.output_layer = nn.Linear(linear_dim[-1], 1)
+    
+    def initialize_inputlayer(self, conv_dim, m_dim, b_dim, dropout):
+        graph_conv_dim, aux_dim, linear_dim = conv_dim
+        # discriminator
+        self.gcn_layer = GraphConvolution(m_dim, graph_conv_dim, b_dim, dropout)
+        self.agg_layer = GraphAggregation(graph_conv_dim[-1], aux_dim, b_dim, dropout)
+
+
 
     def forward(self, adj, hidden, node, activatation=None):
         adj = adj[:,:,:,1:].permute(0,3,1,2)

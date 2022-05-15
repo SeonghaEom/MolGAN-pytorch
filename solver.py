@@ -49,6 +49,7 @@ class Solver(object):
         self.beta1 = config.beta1
         self.beta2 = config.beta2
         self.resume_iters = config.resume_iters
+        self.finetune = config.finetune
 
         # Test configurations.
         self.test_iters = config.test_iters
@@ -112,6 +113,9 @@ class Solver(object):
         self.G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
         self.D.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
         self.V.load_state_dict(torch.load(V_path, map_location=lambda storage, loc: storage))
+
+        ## output layer change
+
 
     def build_tensorboard(self):
         """Build a tensorboard logger."""
@@ -225,6 +229,16 @@ class Solver(object):
         if self.resume_iters:
             start_iters = self.resume_iters
             self.restore_model(self.resume_iters)
+        if self.finetune:
+            self.G.initialize_outputlayer(self.g_conv_dim, self.z_dim,
+                                     self.data.vertexes,
+                                    self.data.bond_num_types,
+                                    self.data.atom_num_types,
+                                    self.dropout)
+            self.D.initialize_inputlayer(self.d_conv_dim, self.data.atom_num_types,
+                                    self.data.bond_num_types, self.dropout)
+            self.G.to(self.device)
+            self.D.to(self.device)
 
         # Start training.
         print('Start training...')
@@ -366,12 +380,16 @@ class Solver(object):
     def test(self):
         # Load the trained generator.
         self.restore_model(self.test_iters)
+        start_time = time.time()
+        log = "start [{}]".format(start_time)
+
 
         with torch.no_grad():
             mols, _, _, a, x, _, _, _, _ = self.data.next_test_batch()
             z = self.sample_z(a.shape[0])
 
             # Z-to-target
+            z = torch.from_numpy(z).to(self.device).float()
             edges_logits, nodes_logits = self.G(z)
             # Postprocess with Gumbel softmax
             (edges_hat, nodes_hat) = self.postprocess((edges_logits, nodes_logits), self.post_method)
@@ -386,7 +404,13 @@ class Solver(object):
 
             # Log update
             m0, m1 = all_scores(mols, self.data, norm=True)     # 'mols' is output of Fake Reward
+            # print(m0, m1)
             m0 = {k: np.array(v)[np.nonzero(v)].mean() for k, v in m0.items()}
             m0.update(m1)
             for tag, value in m0.items():
                 log += ", {}: {:.4f}".format(tag, value)
+        et = time.time() - start_time
+        et = str(datetime.timedelta(seconds=et))[:-7]
+        log += "Elapsed [{}]".format(et)
+        print(log)
+        

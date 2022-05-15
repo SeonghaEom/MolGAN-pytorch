@@ -36,6 +36,7 @@ class SparseMolecularDataset():
             self.data = list(filter(lambda x: x is not None, Chem.SDMolSupplier(filename)))
         elif filename.endswith('.smi'):
             self.data = [Chem.MolFromSmiles(line) for line in open(filename, 'r').readlines()]
+            self.data = list(filter(lambda x: x!=None, self.data))
 
         self.data = list(map(Chem.AddHs, self.data)) if add_h else self.data
         self.data = list(filter(filters, self.data))
@@ -288,9 +289,16 @@ class SparseMolecularDataset():
 
 
 if __name__ == '__main__':
+    # data = SparseMolecularDataset()
+    # data.generate('gdb9.sdf', filters=lambda x: x.GetNumAtoms() <= 9)
+    # data.save('gdb9_9nodes.sparsedataset')
+
+    # try:
     data = SparseMolecularDataset()
-    data.generate('gdb9.sdf', filters=lambda x: x.GetNumAtoms() <= 9)
-    data.save('gdb9_9nodes.sparsedataset')
+    data.generate('bbbp.smi', filters=lambda x: x.GetNumAtoms() <= 9)
+    data.save('bbbp_9nodes.sparsedataset')
+    # except:
+    #     pass
 
     # data = SparseMolecularDataset()
     # data.generate('data/qm9_5k.smi', validation=0.00021, test=0.00021)  # , filters=lambda x: x.GetNumAtoms() <= 9)
